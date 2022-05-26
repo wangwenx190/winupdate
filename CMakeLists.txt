@@ -27,7 +27,7 @@ cmake_minimum_required(VERSION 3.23)
 project(WinUpdate
     VERSION 1.0.0.0
     DESCRIPTION "A convenient tool to update your Microsoft Store applications and Windows itself."
-    HOMEPAGE_URL "aaa"
+    HOMEPAGE_URL "https://github.com/wangwenx190/winupdate/"
     LANGUAGES CXX
 )
 
