@@ -97,7 +97,7 @@ target_link_options(${PROJECT_NAME} PRIVATE
     /TSAWARE /GUARD:CF /guard:ehcont /CETCOMPAT /WX
 )
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+if(NOT (CMAKE_BUILD_TYPE STREQUAL "Debug"))
     target_compile_options(${PROJECT_NAME} PRIVATE
         /Zc:inline /GA /Gy /Gw /GT
     )
