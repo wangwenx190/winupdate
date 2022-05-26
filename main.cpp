@@ -238,7 +238,7 @@ static inline void UpdateSystem()
     hr = pAu->EnableService();
     if (FAILED(hr)) {
         std::wcerr << VT_RED << L"EnableService() failed with error " << GetSystemErrorMessage(HRESULT_CODE(hr)) << VT_DEFAULT << std::endl;
-        return;
+        //return;
     }
     CComPtr<IAutomaticUpdatesSettings3> pAus = nullptr;
     hr = pAu->get_Settings(reinterpret_cast<IAutomaticUpdatesSettings **>(&pAus));
