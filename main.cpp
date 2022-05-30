@@ -52,6 +52,7 @@
 #include <atlbase.h>
 #include <io.h>
 #include <fcntl.h>
+#include <VersionHelpers.h>
 #include <winrt\Windows.Foundation.h>
 #include <winrt\Windows.Foundation.Collections.h>
 #include <winrt\Windows.ApplicationModel.Store.Preview.InstallControl.h>
@@ -89,34 +90,40 @@ namespace winrt
 
 [[nodiscard]] static inline bool IsCurrentProcessElevated()
 {
-    SID_IDENTIFIER_AUTHORITY ntAuthority = SECURITY_NT_AUTHORITY;
-    PSID administratorsGroup = nullptr;
-    BOOL result = AllocateAndInitializeSid(&ntAuthority, 2, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &administratorsGroup);
-    if (result == FALSE) {
-        std::wcerr << VT_RED << L"AllocateAndInitializeSid() failed with error " << GetSystemErrorMessage(GetLastError()) << VT_DEFAULT << std::endl;
-    } else {
-        if (CheckTokenMembership(nullptr, administratorsGroup, &result) == FALSE) {
-            result = FALSE;
-            std::wcerr << VT_RED << L"CheckTokenMembership() failed with error " << GetSystemErrorMessage(GetLastError()) << VT_DEFAULT << std::endl;
+    static const bool admin = []() -> bool {
+        SID_IDENTIFIER_AUTHORITY ntAuthority = SECURITY_NT_AUTHORITY;
+        PSID administratorsGroup = nullptr;
+        BOOL result = AllocateAndInitializeSid(&ntAuthority, 2, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &administratorsGroup);
+        if (result == FALSE) {
+            std::wcerr << VT_RED << L"AllocateAndInitializeSid() failed with error " << GetSystemErrorMessage(GetLastError()) << VT_DEFAULT << std::endl;
+        } else {
+            if (CheckTokenMembership(nullptr, administratorsGroup, &result) == FALSE) {
+                result = FALSE;
+                std::wcerr << VT_RED << L"CheckTokenMembership() failed with error " << GetSystemErrorMessage(GetLastError()) << VT_DEFAULT << std::endl;
+            }
+            FreeSid(administratorsGroup);
         }
-        FreeSid(administratorsGroup);
-    }
-    return (result != FALSE);
+        return (result != FALSE);
+    }();
+    return admin;
 }
 
 [[nodiscard]] static inline std::wstring GetApplicationFilePath()
 {
-    wchar_t path[MAX_PATH] = {};
-    if (GetModuleFileNameW(nullptr, path, MAX_PATH) == 0) {
-        std::wcerr << VT_RED << L"GetModuleFileNameW() failed with error " << GetSystemErrorMessage(GetLastError()) << VT_DEFAULT << std::endl;
-        return L"";
-    }
-    return path;
+    static const std::wstring result = []() -> std::wstring {
+        wchar_t path[MAX_PATH] = {};
+        if (GetModuleFileNameW(nullptr, path, MAX_PATH) == 0) {
+            std::wcerr << VT_RED << L"GetModuleFileNameW() failed with error " << GetSystemErrorMessage(GetLastError()) << VT_DEFAULT << std::endl;
+            return L"";
+        }
+        return path;
+    }();
+    return result;
 }
 
 static inline void RestartAsElevatedProcess()
 {
-    const std::wstring path = GetApplicationFilePath();
+    static const std::wstring path = GetApplicationFilePath();
 
     SHELLEXECUTEINFOW sei;
     SecureZeroMemory(&sei, sizeof(sei));
@@ -134,6 +141,10 @@ static inline void RestartAsElevatedProcess()
 
 static inline void EnableMicrosoftUpdate()
 {
+    static const bool win10 = IsWindows10OrGreater();
+    if (!win10) {
+        return;
+    }
     CComPtr<IUpdateServiceManager2> pUpdateServiceManager = nullptr;
     HRESULT hr = CoCreateInstance(CLSID_UpdateServiceManager, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pUpdateServiceManager));
     if (FAILED(hr)) {
@@ -162,6 +173,11 @@ static inline void EnableMicrosoftUpdate()
 
 static inline void UpdateStoreApps()
 {
+    static const bool win10 = IsWindows10OrGreater();
+    if (!win10) {
+        return;
+    }
+
     std::wcout << VT_CYAN << L"Start updating Microsoft Store applications ..." << VT_DEFAULT << std::endl;
 
     while (true) {
@@ -229,6 +245,8 @@ static inline void UpdateSystem()
 {
     std::wcout << VT_CYAN << L"Start updating system ..." << VT_DEFAULT << std::endl;
 
+    static const bool win10 = IsWindows10OrGreater();
+
     while (true) {
 #if 0
         CComPtr<IAutomaticUpdates2> pAutomaticUpdates = nullptr;
@@ -237,11 +255,13 @@ static inline void UpdateSystem()
             std::wcerr << VT_RED << L"CoCreateInstance() failed with error " << GetSystemErrorMessage(HRESULT_CODE(hr)) << VT_DEFAULT << std::endl;
             return;
         }
+#if 0 // "EnableService()" always fail, don't know why.
         hr = pAutomaticUpdates->EnableService();
         if (FAILED(hr)) {
             std::wcerr << VT_RED << L"EnableService() failed with error " << GetSystemErrorMessage(HRESULT_CODE(hr)) << VT_DEFAULT << std::endl;
-            //return;
+            return;
         }
+#endif
         CComPtr<IAutomaticUpdatesSettings3> pAutomaticUpdatesSettings = nullptr;
         hr = pAutomaticUpdates->get_Settings(reinterpret_cast<IAutomaticUpdatesSettings **>(&pAutomaticUpdatesSettings));
         if (FAILED(hr)) {
@@ -311,12 +331,14 @@ static inline void UpdateSystem()
             std::wcerr << VT_RED << L"CreateUpdateSearcher() failed with error " << GetSystemErrorMessage(HRESULT_CODE(hr)) << VT_DEFAULT << std::endl;
             return;
         }
+#if 0 // "put_CanAutomaticallyUpgradeService()" always fail, don't know why.
         hr = pUpdateSearcher->put_CanAutomaticallyUpgradeService(VARIANT_TRUE);
         if (FAILED(hr)) {
-            //SysFreeString(appId);
+            SysFreeString(appId);
             std::wcerr << VT_RED << L"put_CanAutomaticallyUpgradeService() failed with error " << GetSystemErrorMessage(HRESULT_CODE(hr)) << VT_DEFAULT << std::endl;
-            //return;
+            return;
         }
+#endif
         hr = pUpdateSearcher->put_Online(VARIANT_TRUE);
         if (FAILED(hr)) {
             SysFreeString(appId);
@@ -439,12 +461,14 @@ static inline void UpdateSystem()
             std::wcerr << VT_RED << L"put_ForceQuiet() failed with error " << GetSystemErrorMessage(HRESULT_CODE(hr)) << VT_DEFAULT << std::endl;
             return;
         }
-        hr = pUpdateInstaller->put_AttemptCloseAppsIfNecessary(VARIANT_TRUE);
-        if (FAILED(hr)) {
-            SysFreeString(criteria);
-            SysFreeString(appId);
-            std::wcerr << VT_RED << L"put_AttemptCloseAppsIfNecessary() failed with error " << GetSystemErrorMessage(HRESULT_CODE(hr)) << VT_DEFAULT << std::endl;
-            return;
+        if (win10) {
+            hr = pUpdateInstaller->put_AttemptCloseAppsIfNecessary(VARIANT_TRUE);
+            if (FAILED(hr)) {
+                SysFreeString(criteria);
+                SysFreeString(appId);
+                std::wcerr << VT_RED << L"put_AttemptCloseAppsIfNecessary() failed with error " << GetSystemErrorMessage(HRESULT_CODE(hr)) << VT_DEFAULT << std::endl;
+                return;
+            }
         }
         CComPtr<IInstallationResult> pInstallationResult = nullptr;
         hr = pUpdateInstaller->Install(&pInstallationResult);
@@ -468,12 +492,14 @@ static inline void UpdateSystem()
             std::wcerr << VT_RED << L"Failed to install Windows updates." << VT_DEFAULT << std::endl;
             return;
         }
-        hr = pUpdateInstaller->Commit(0);
-        if (FAILED(hr)) {
-            SysFreeString(criteria);
-            SysFreeString(appId);
-            std::wcerr << VT_RED << L"Commit() failed with error " << GetSystemErrorMessage(HRESULT_CODE(hr)) << VT_DEFAULT << std::endl;
-            return;
+        if (win10) {
+            hr = pUpdateInstaller->Commit(0);
+            if (FAILED(hr)) {
+                SysFreeString(criteria);
+                SysFreeString(appId);
+                std::wcerr << VT_RED << L"Commit() failed with error " << GetSystemErrorMessage(HRESULT_CODE(hr)) << VT_DEFAULT << std::endl;
+                return;
+            }
         }
         SysFreeString(criteria);
         SysFreeString(appId);
@@ -486,26 +512,29 @@ static inline void UpdateSystem()
 
 static inline void InitializeConsole()
 {
-    const auto EnableVTSequencesForConsole = [](const DWORD handleId) -> bool {
-        const HANDLE handle = GetStdHandle(handleId);
-        if (!handle || (handle == INVALID_HANDLE_VALUE)) {
-            std::wcerr << VT_RED << L"GetStdHandle() failed with error " << GetSystemErrorMessage(GetLastError()) << VT_DEFAULT << std::endl;
-            return false;
-        }
-        DWORD mode = 0;
-        if (GetConsoleMode(handle, &mode) == FALSE) {
-            std::wcerr << VT_RED << L"GetConsoleMode() failed with error " << GetSystemErrorMessage(GetLastError()) << VT_DEFAULT << std::endl;
-            return false;
-        }
-        mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-        if (SetConsoleMode(handle, mode) == FALSE) {
-            std::wcerr << VT_RED << L"SetConsoleMode() failed with error " << GetSystemErrorMessage(GetLastError()) << VT_DEFAULT << std::endl;
-            return false;
-        }
-        return true;
-    };
-    EnableVTSequencesForConsole(STD_OUTPUT_HANDLE);
-    EnableVTSequencesForConsole(STD_ERROR_HANDLE);
+    static const bool win10 = IsWindows10OrGreater();
+    if (win10) {
+        const auto EnableVTSequencesForConsole = [](const DWORD handleId) -> bool {
+            const HANDLE handle = GetStdHandle(handleId);
+            if (!handle || (handle == INVALID_HANDLE_VALUE)) {
+                std::wcerr << VT_RED << L"GetStdHandle() failed with error " << GetSystemErrorMessage(GetLastError()) << VT_DEFAULT << std::endl;
+                return false;
+            }
+            DWORD mode = 0;
+            if (GetConsoleMode(handle, &mode) == FALSE) {
+                std::wcerr << VT_RED << L"GetConsoleMode() failed with error " << GetSystemErrorMessage(GetLastError()) << VT_DEFAULT << std::endl;
+                return false;
+            }
+            mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+            if (SetConsoleMode(handle, mode) == FALSE) {
+                std::wcerr << VT_RED << L"SetConsoleMode() failed with error " << GetSystemErrorMessage(GetLastError()) << VT_DEFAULT << std::endl;
+                return false;
+            }
+            return true;
+        };
+        EnableVTSequencesForConsole(STD_OUTPUT_HANDLE);
+        EnableVTSequencesForConsole(STD_ERROR_HANDLE);
+    }
 
     if (SetConsoleOutputCP(CP_UTF8) == FALSE) {
         std::wcerr << VT_RED << L"SetConsoleOutputCP() failed with error " << GetSystemErrorMessage(GetLastError()) << VT_DEFAULT << std::endl;
