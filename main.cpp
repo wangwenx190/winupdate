@@ -550,8 +550,8 @@ extern "C" int APIENTRY wmain(int argc, wchar_t *argv[])
     UNREFERENCED_PARAMETER(argc);
     UNREFERENCED_PARAMETER(argv);
 
-    _setmode(_fileno(stdout), _O_U16TEXT);
-    _setmode(_fileno(stderr), _O_U16TEXT);
+    _setmode(_fileno(stdout), _O_WTEXT);
+    _setmode(_fileno(stderr), _O_WTEXT);
 
     InitializeConsole();
 
