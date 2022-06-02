@@ -70,13 +70,30 @@ enum class ConsoleTextColor
     White   = 8
 };
 
-static constexpr const int kVirtualTerminalForegroundColor[] = {0, 90, 91, 92, 93, 94, 95, 96, 97};
+static constexpr const int kVirtualTerminalForegroundColor[] =
+{
+    0, // Default
+    90, // Black
+    91, // Red
+    92, // Green
+    93, // Yellow
+    94, // Blue
+    95, // Magenta
+    96, // Cyan
+    97 // White
+};
 
 static constexpr const WORD kClassicForegroundColor[] =
 {
-    0, FOREGROUND_RED, FOREGROUND_GREEN, FOREGROUND_GREEN | FOREGROUND_RED, FOREGROUND_BLUE,
-    FOREGROUND_BLUE | FOREGROUND_RED, FOREGROUND_BLUE | FOREGROUND_GREEN,
-    FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED
+    0, // Default
+    0, // Black
+    FOREGROUND_RED, // Red
+    FOREGROUND_GREEN, // Green
+    FOREGROUND_RED | FOREGROUND_GREEN, // Yellow
+    FOREGROUND_BLUE, // Blue
+    FOREGROUND_RED | FOREGROUND_BLUE, // Magenta
+    FOREGROUND_GREEN | FOREGROUND_BLUE, // Cyan
+    FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE // White
 };
 
 [[nodiscard]] static inline bool IsVirtualTerminalSequencesSupported()
