@@ -73,14 +73,14 @@ enum class ConsoleTextColor
 static constexpr const int kVirtualTerminalForegroundColor[] =
 {
     0, // Default
-    90, // Black
-    91, // Red
-    92, // Green
-    93, // Yellow
-    94, // Blue
-    95, // Magenta
-    96, // Cyan
-    97 // White
+    30, // Black
+    31, // Red
+    32, // Green
+    33, // Yellow
+    34, // Blue
+    35, // Magenta
+    36, // Cyan
+    37 // White
 };
 
 static constexpr const WORD kClassicForegroundColor[] =
@@ -109,7 +109,7 @@ static inline void PrintToConsole(const std::wstring &text, const ConsoleTextCol
     }
     FILE * const channel = (error ? stderr : stdout);
     if (IsVirtualTerminalSequencesSupported()) {
-        if (std::fwprintf(channel, L"\x1b[%dm%s\x1b[0m\r\n", kVirtualTerminalForegroundColor[static_cast<int>(color)], text.c_str()) < 1) {
+        if (std::fwprintf(channel, L"\x1b[1;%dm%s\x1b[0m\r\n", kVirtualTerminalForegroundColor[static_cast<int>(color)], text.c_str()) < 1) {
             // ###
         }
     } else {
