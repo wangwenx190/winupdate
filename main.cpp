@@ -56,6 +56,7 @@
 #include <VersionHelpers.h>
 #include <winrt\Windows.Foundation.Collections.h>
 #include <winrt\Windows.ApplicationModel.Store.Preview.InstallControl.h>
+#include <clocale>
 
 enum class ConsoleTextColor
 {
@@ -109,7 +110,7 @@ static inline void PrintToConsole(const std::wstring &text, const ConsoleTextCol
     }
     FILE * const channel = (error ? stderr : stdout);
     if (IsVirtualTerminalSequencesSupported()) {
-        if (std::fwprintf(channel, L"\x1b[1;%dm%s\x1b[0m\r\n", kVirtualTerminalForegroundColor[static_cast<int>(color)], text.c_str()) < 1) {
+        if (std::fwprintf(channel, L"\x1b[1;%dm%s\x1b[0m\n", kVirtualTerminalForegroundColor[static_cast<int>(color)], text.c_str()) < 1) {
             // ###
         }
     } else {
@@ -127,7 +128,7 @@ static inline void PrintToConsole(const std::wstring &text, const ConsoleTextCol
         if (SetConsoleTextAttribute(hCon, (newColor | (originalColor & 0xF0))) == FALSE) {
             return;
         }
-        if (std::fwprintf(channel, L"%s\r\n", text.c_str()) < 1) {
+        if (std::fwprintf(channel, L"%s\n", text.c_str()) < 1) {
             // ###
         }
         if (SetConsoleTextAttribute(hCon, originalColor) == FALSE) {
@@ -379,7 +380,7 @@ static inline void UpdateStoreApps()
         }
     }
 
-    PrintSuccess(L"All your Microsoft Store applications are update to date!\r\n\r\n");
+    PrintSuccess(L"All your Microsoft Store applications are update to date!\n\n");
 }
 
 static inline void UpdateSystem()
@@ -646,7 +647,7 @@ static inline void UpdateSystem()
 #endif
     }
 
-    PrintSuccess(L"Your system is update to date!\r\n\r\n");
+    PrintSuccess(L"Your system is update to date!\n\n");
 }
 
 static inline void InitializeConsole()
@@ -684,15 +685,17 @@ static inline void InitializeConsole()
     }
 }
 
-extern "C" int APIENTRY wmain(int argc, wchar_t *argv[])
+EXTERN_C int WINAPI wmain(int argc, wchar_t *argv[])
 {
     UNREFERENCED_PARAMETER(argc);
     UNREFERENCED_PARAMETER(argv);
 
+    std::setlocale(LC_ALL, "en_US.UTF-8");
+
     winrt::init_apartment(winrt::apartment_type::single_threaded);
 
-    _setmode(_fileno(stdout), _O_WTEXT);
-    _setmode(_fileno(stderr), _O_WTEXT);
+    _setmode(_fileno(stdout), _O_U16TEXT);
+    _setmode(_fileno(stderr), _O_U16TEXT);
 
     InitializeConsole();
 
@@ -709,12 +712,12 @@ extern "C" int APIENTRY wmain(int argc, wchar_t *argv[])
         EnableMicrosoftUpdate();
         UpdateSystem();
     } else {
-        PrintError(L"You need to connect to the Internet first!\r\n");
+        PrintError(L"You need to connect to the Internet first!\n");
     }
 
     winrt::uninit_apartment();
 
-    PrintToConsole(L"\r\n-- PRESS THE <ENTER> KEY TO EXIT --", ConsoleTextColor::Magenta, false);
+    PrintToConsole(L"\n-- PRESS THE <ENTER> KEY TO EXIT --", ConsoleTextColor::Magenta, false);
     getchar();
 
     return 0;

@@ -22,31 +22,25 @@
   SOFTWARE.
 ]]
 
-cmake_minimum_required(VERSION 3.23)
+cmake_minimum_required(VERSION 3.24)
 
 project(WinUpdate
     VERSION 1.0.0.0
     DESCRIPTION "A convenient tool to update your Microsoft Store applications and Windows itself."
     HOMEPAGE_URL "https://github.com/wangwenx190/winupdate/"
-    LANGUAGES CXX
+    LANGUAGES RC CXX
 )
 
 if(NOT DEFINED CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-if(NOT (CMAKE_BUILD_TYPE STREQUAL "Debug"))
-    if(NOT DEFINED CMAKE_INTERPROCEDURAL_OPTIMIZATION)
-        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
-    endif()
+if(NOT DEFINED CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 endif()
 
 if(NOT DEFINED CMAKE_DEBUG_POSTFIX)
-    if(WIN32)
-        set(CMAKE_DEBUG_POSTFIX d)
-    else()
-        set(CMAKE_DEBUG_POSTFIX _debug)
-    endif()
+    set(CMAKE_DEBUG_POSTFIX d)
 endif()
 
 if(NOT DEFINED CMAKE_MSVC_RUNTIME_LIBRARY)
@@ -75,6 +69,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
+string(REGEX REPLACE "[-|/]GR" "/GR-" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+#string(REGEX REPLACE "[-|/]EHsc" "/EHs-c-" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+string(REGEX REPLACE "[-|/]W[0|1|2|3|4]" "/W4" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+string(REGEX REPLACE "[-|/]Ob[0|1|2|3]" "/Ob3" CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
+
 add_executable(${PROJECT_NAME})
 
 target_sources(${PROJECT_NAME} PRIVATE
@@ -85,27 +84,20 @@ set(_WIN32_WINNT_WIN10 0x0A00)
 set(NTDDI_WIN10_CO 0x0A00000B)
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     _CRT_NON_CONFORMING_SWPRINTFS _CRT_SECURE_NO_WARNINGS
-    _ENABLE_EXTENDED_ALIGNED_STORAGE NOMINMAX UNICODE _UNICODE
-    WIN32_LEAN_AND_MEAN WINRT_LEAN_AND_MEAN WINVER=${_WIN32_WINNT_WIN10}
-    _WIN32_WINNT=${_WIN32_WINNT_WIN10} _WIN32_IE=${_WIN32_WINNT_WIN10}
-    NTDDI_VERSION=${NTDDI_WIN10_CO}
+    _ENABLE_EXTENDED_ALIGNED_STORAGE NOMINMAX UNICODE
+    _UNICODE WIN32_LEAN_AND_MEAN WINRT_LEAN_AND_MEAN
+    WINVER=${_WIN32_WINNT_WIN10} _WIN32_WINNT=${_WIN32_WINNT_WIN10}
+    _WIN32_IE=${_WIN32_WINNT_WIN10} NTDDI_VERSION=${NTDDI_WIN10_CO}
 )
 
 target_compile_options(${PROJECT_NAME} PRIVATE
-    /await:strict /bigobj /utf-8 /W4 /WX /guard:cf
-    /guard:ehcont /Zc:__cplusplus /permissive- /GR
-    /EHsc /d2FH4
-)
-target_link_options(${PROJECT_NAME} PRIVATE
-    /DYNAMICBASE /HIGHENTROPYVA /LARGEADDRESSAWARE /NXCOMPAT
-    /TSAWARE /GUARD:CF /guard:ehcont /CETCOMPAT /WX
+    /await:strict /bigobj /d2FH4 /MP /FS /utf-8 /WX /permissive- /ZH:SHA_256
+    /Zc:char8_t,__cplusplus,externC,externConstexpr,hiddenFriend,lambda,preprocessor,referenceBinding,rvalueCast,strictStrings,ternary,throwingNew,trigraphs
+    $<$<CONFIG:Debug>:/JMC>
+    $<$<NOT:$<CONFIG:Debug>>:/guard:cf /guard:ehcont /GA /GT /Gw /Gy /Oi /Oy /QIntel-jcc-erratum /Qspectre-load /Zc:inline>
 )
 
-if(NOT (CMAKE_BUILD_TYPE STREQUAL "Debug"))
-    target_compile_options(${PROJECT_NAME} PRIVATE
-        /Zc:inline /GA /Gy /Gw /GT
-    )
-    target_link_options(${PROJECT_NAME} PRIVATE
-        /OPT:REF /OPT:ICF
-    )
-endif()
+target_link_options(${PROJECT_NAME} PRIVATE
+    /DYNAMICBASE /HIGHENTROPYVA /LARGEADDRESSAWARE /NXCOMPAT /TSAWARE /WX
+    $<$<NOT:$<CONFIG:Debug>>:/CETCOMPAT /GUARD:CF /GUARD:EHCONT /OPT:REF /OPT:ICF>
+)
