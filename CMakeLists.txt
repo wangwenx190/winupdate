@@ -1,7 +1,7 @@
 #[[
   MIT License
 
-  Copyright (C) 2022 by wangwenx190 (Yuhang Zhao)
+  Copyright (C) 2023 by wangwenx190 (Yuhang Zhao)
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -22,83 +22,102 @@
   SOFTWARE.
 ]]
 
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.28)
 
 project(WinUpdate
-    VERSION 1.0.0.0
-    DESCRIPTION "A convenient tool to update your Microsoft Store applications and Windows itself."
-    HOMEPAGE_URL "https://github.com/wangwenx190/winupdate/"
-    LANGUAGES RC CXX
+    VERSION "1.0.0.0"
+    DESCRIPTION "A convenient tool to update Microsoft Store applications and Windows."
+    HOMEPAGE_URL "https://wangwenx190.github.io/winupdate/"
 )
 
-if(NOT DEFINED CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+option(WU_ENABLE_VCLTL "Enable VC-LTL." OFF)
+option(WU_ENABLE_YYTHUNKS "Enable YY-Thunks." OFF)
+
+include(cmake/utils.cmake)
+
+setup_project(
+    ENABLE_LTO
+    MAX_WARNING
+    #WARNINGS_ARE_ERRORS
+    RTTI
+    EXCEPTIONS
+    LANGUAGES CXX
+)
+
+if(MSVC)
+    if(WU_ENABLE_VCLTL)
+        include(cmake/VC-LTL.cmake)
+        if("x${SupportLTL}" STREQUAL "xtrue")
+            # Make sure we will always overwrite the previous settings.
+            unset(CMAKE_MSVC_RUNTIME_LIBRARY)
+            unset(CMAKE_MSVC_RUNTIME_LIBRARY CACHE)
+            #unset(CMAKE_MSVC_RUNTIME_LIBRARY PARENT_SCOPE)
+            set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "" FORCE)
+        endif()
+    endif()
+    if(WU_ENABLE_YYTHUNKS)
+        unset(YYTHUNKS_TARGET_OS)
+        unset(YYTHUNKS_TARGET_OS CACHE)
+        #unset(YYTHUNKS_TARGET_OS PARENT_SCOPE)
+        set(YYTHUNKS_TARGET_OS "WinXP" CACHE STRING "" FORCE)
+        include(cmake/YY-Thunks.cmake)
+    endif()
 endif()
-
-if(NOT DEFINED CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE)
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-endif()
-
-if(NOT DEFINED CMAKE_DEBUG_POSTFIX)
-    set(CMAKE_DEBUG_POSTFIX d)
-endif()
-
-if(NOT DEFINED CMAKE_MSVC_RUNTIME_LIBRARY)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreaded$<$<CONFIG:Debug>:Debug>)
-endif()
-
-if(NOT DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY)
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
-endif()
-
-if(NOT DEFINED CMAKE_LIBRARY_OUTPUT_DIRECTORY)
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
-endif()
-
-if(NOT DEFINED CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
-    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
-endif()
-
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
-
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
-
-string(REGEX REPLACE "[-|/]GR" "/GR-" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
-#string(REGEX REPLACE "[-|/]EHsc" "/EHs-c-" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
-string(REGEX REPLACE "[-|/]W[0|1|2|3|4]" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
-string(REGEX REPLACE "[-|/]Ob[0|1|2|3]" "/Ob3" CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
-string(APPEND CMAKE_RC_FLAGS " /c65001 /nologo ")
 
 add_executable(${PROJECT_NAME})
 
+set(__rc_path "${PROJECT_BINARY_DIR}/${PROJECT_NAME}.rc")
+generate_win32_rc_file(
+    PATH "${__rc_path}"
+    VERSION "${PROJECT_VERSION}"
+    COMPANY "wangwenx190"
+    DESCRIPTION "${PROJECT_DESCRIPTION}"
+    COPYRIGHT "MIT License"
+    PRODUCT "Windows Updater"
+    ICONS "app.ico"
+)
+
+set(__manifest_path "${PROJECT_BINARY_DIR}/${PROJECT_NAME}.manifest")
+generate_win32_manifest_file(
+    PATH "${__manifest_path}"
+    ID "org.wangwenx190.winupdate"
+    VERSION "${PROJECT_VERSION}"
+    DESCRIPTION "${PROJECT_DESCRIPTION}"
+    VISTA_COMPAT
+    WIN7_COMPAT
+    WIN8_COMPAT
+    WIN8_1_COMPAT
+    WIN10_COMPAT
+    WIN11_COMPAT
+    XAML_ISLANDS_COMPAT
+    UTF8_CODEPAGE
+)
+
 target_sources(${PROJECT_NAME} PRIVATE
-    app.manifest app.rc main.cpp
+    "${__rc_path}"
+    "${__manifest_path}"
+    main.cpp
 )
 
-set(_WIN32_WINNT_WIN10 0x0A00)
-set(NTDDI_WIN10_CO 0x0A00000B)
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-    _CRT_NON_CONFORMING_SWPRINTFS _CRT_SECURE_NO_WARNINGS
-    _ENABLE_EXTENDED_ALIGNED_STORAGE NOMINMAX UNICODE
-    _UNICODE WIN32_LEAN_AND_MEAN WINRT_LEAN_AND_MEAN
-    WINVER=${_WIN32_WINNT_WIN10} _WIN32_WINNT=${_WIN32_WINNT_WIN10}
-    _WIN32_IE=${_WIN32_WINNT_WIN10} NTDDI_VERSION=${NTDDI_WIN10_CO}
+set(SYSCMDLINE_BUILD_STATIC ON)
+set(SYSCMDLINE_BUILD_TESTS OFF)
+set(SYSCMDLINE_INSTALL OFF)
+add_subdirectory(syscmdline)
+
+setup_compile_params(
+    TARGETS ${PROJECT_NAME} syscmdline
+    SPECTRE
+    EHCONTGUARD
+    PERMISSIVE
+    INTELCET
+    INTELJCC
+    CFGUARD
+    FORCE_LTO
+    SECURE_CODE
 )
 
-target_compile_options(${PROJECT_NAME} PRIVATE
-    /await:strict /bigobj /d2FH4 /MP /FS /utf-8 /W4 /WX /permissive- /ZH:SHA_256
-    /Zc:char8_t,__cplusplus,externC,externConstexpr,hiddenFriend,lambda,preprocessor,referenceBinding,rvalueCast,strictStrings,ternary,throwingNew,trigraphs
-    $<$<CONFIG:Debug>:/JMC>
-    $<$<NOT:$<CONFIG:Debug>>:/guard:cf /guard:ehcont /GA /GT /Gw /Gy /Oi /Oy /QIntel-jcc-erratum /Qspectre-load /Zc:inline>
+target_link_libraries(${PROJECT_NAME} PRIVATE
+    syscmdline
 )
 
-target_link_options(${PROJECT_NAME} PRIVATE
-    /DYNAMICBASE /HIGHENTROPYVA /LARGEADDRESSAWARE /NXCOMPAT /TSAWARE /WX
-    $<$<NOT:$<CONFIG:Debug>>:/CETCOMPAT /GUARD:CF /GUARD:EHCONT /OPT:REF /OPT:ICF>
-)
+install2(TARGETS ${PROJECT_NAME})

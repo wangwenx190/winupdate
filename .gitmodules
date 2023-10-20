@@ -1,0 +1,8 @@
+[submodule "cmake"]
+	path = cmake
+	url = https://github.com/wangwenx190/cmake-utils.git
+	branch = main
+[submodule "syscmdline"]
+	path = syscmdline
+	url = https://github.com/SineStriker/syscmdline.git
+	branch = main
